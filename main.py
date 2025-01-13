@@ -174,7 +174,7 @@ class ReportProcessor:
         }
         self.reports.append(report)
 
-    def save_report_markdown(self, report_data: Dict[str, Any], report_id: str) -> None:
+    def save_report_markdown(self, report_data: Dict[str, Any], report_id: str, node: Dict[str, Any]) -> None:
         content = f"""# {report_data['title']}
 
 ## Vulnerability Information
@@ -183,12 +183,34 @@ class ReportProcessor:
 ## Summary
 {' '.join(filter(None, [s.get('content') for s in report_data['summaries']]))}
 
+## Report Details
+- Reporter: {node['reporter']['username']}
+- CVE IDs: {', '.join(node['cve_ids']) if node['cve_ids'] else 'None'}
+- CWE: {node['cwe']}
+- Severity: {node['severity_rating']}
+- Votes: {node['votes']}
+- Awarded Amount: {node['total_awarded_amount']}
+- State: {node['report']['substate']}
+- Program: {node['program']['name']}
+
 ## Report URL
 {report_data['url']}
 
 ## Disclosed At
 {report_data['disclosed_at']}
+
+## Comments
 """
+        # Add formatted comments
+        comments = self.format_comments(node['report']['comments']['nodes'])
+        for comment in comments:
+            if 'message' in comment:
+                content += f"\n### Comment\n{comment['message']}\n"
+            if 'attachments' in comment:
+                for attachment in comment['attachments']:
+                    if 'content' in attachment:
+                        content += f"\n#### Attachment\n```\n{attachment['content']}\n```\n"
+
         report_file = self.config.REPORTS_DIR / f"{report_id}.md"
         report_file.write_text(content, encoding='utf-8')
 
@@ -249,7 +271,7 @@ def main():
             report_data = api.fetch_report_details(node['_id'])
             
             if report_data:
-                processor.save_report_markdown(report_data, node['_id'])
+                processor.save_report_markdown(report_data, node['_id'], node)
                 processor.process_report(node, report_data)
                 
     except Exception as e:
