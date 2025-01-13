@@ -175,41 +175,41 @@ class ReportProcessor:
         self.reports.append(report)
 
     def save_report_markdown(self, report_data: Dict[str, Any], report_id: str, node: Dict[str, Any]) -> None:
-        content = f"""# {report_data['title']}
+        content = f"""# Security Vulnerability Report
 
-## Vulnerability Information
-{report_data['vulnerability_information']}
-
-## Summary
-{' '.join(filter(None, [s.get('content') for s in report_data['summaries']]))}
-
-## Report Details
+## Metadata
+- Report ID: {report_id}
 - Reporter: {node['reporter']['username']}
+- Program: {node['program']['name']}
+- Severity: {node['severity_rating']}
+- Status: {node['report']['substate']}
+- Disclosure Date: {report_data['disclosed_at']}
 - CVE IDs: {', '.join(node['cve_ids']) if node['cve_ids'] else 'None'}
 - CWE: {node['cwe']}
-- Severity: {node['severity_rating']}
+- Bounty: ${node['total_awarded_amount']}
 - Votes: {node['votes']}
-- Awarded Amount: {node['total_awarded_amount']}
-- State: {node['report']['substate']}
-- Program: {node['program']['name']}
+- URL: {report_data['url']}
 
-## Report URL
-{report_data['url']}
+## Title
+{report_data['title']}
 
-## Disclosed At
-{report_data['disclosed_at']}
+## Technical Description
+{report_data['vulnerability_information']}
 
-## Comments
+## Impact Summary
+{' '.join(filter(None, [s.get('content') for s in report_data['summaries']]))}
+
+## Discussion Thread
 """
-        # Add formatted comments
+        # Add formatted comments with clear delineation
         comments = self.format_comments(node['report']['comments']['nodes'])
-        for comment in comments:
+        for i, comment in enumerate(comments, 1):
             if 'message' in comment:
-                content += f"\n### Comment\n{comment['message']}\n"
+                content += f"\n### Comment {i}\n{comment['message']}\n"
             if 'attachments' in comment:
-                for attachment in comment['attachments']:
+                for j, attachment in enumerate(comment['attachments'], 1):
                     if 'content' in attachment:
-                        content += f"\n#### Attachment\n```\n{attachment['content']}\n```\n"
+                        content += f"\n#### Technical Details {i}.{j}\n```\n{attachment['content']}\n```\n"
 
         report_file = self.config.REPORTS_DIR / f"{report_id}.md"
         report_file.write_text(content, encoding='utf-8')
