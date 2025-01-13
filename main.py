@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from typing import List, Optional, Dict, Any
+from pathlib import Path
 import requests
 import os
 import time
@@ -8,6 +11,16 @@ ATTACHMENTS_DIR = os.path.join(DOWNLOADS_DIR, "attachments")
 
 # TODO: Consider adding visual model to analyse screenshots
 ALLOWED_CONTENT_TYPES = ["text/markdown", "text/x-diff"]
+
+@dataclass
+class Config:
+    DOWNLOADS_DIR: Path = Path("downloads")
+    REPORTS_DIR: Path = DOWNLOADS_DIR / "reports"
+    ATTACHMENTS_DIR: Path = DOWNLOADS_DIR / "attachments"
+    ALLOWED_CONTENT_TYPES: List[str] = ["text/markdown", "text/x-diff"]
+    BASE_URL: str = "https://hackerone.com"
+    RATE_LIMIT_DELAY: int = 1  # seconds between requests
+
 
 QUERY = """
 query {
