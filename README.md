@@ -1,7 +1,6 @@
-# HackerOne Report Downloader
+# Hamsterver
 
-
-Download the latest disclosed reports from HackerOne and save them in markdown files in the `downloads/reports` directory for later LLM use.
+Hamsterver (i.e. public H1 Report Harvester) is a tool to download the latest disclosed reports from HackerOne and save them in markdown files in the `downloads/reports` directory for later LLM use.
 
 ## History
 
