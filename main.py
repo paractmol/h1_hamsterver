@@ -5,7 +5,7 @@ import requests
 import time
 import os
 import sys
-
+import pdb
 @dataclass
 class Config:
     DOWNLOADS_DIR: Path = Path("downloads")
@@ -102,6 +102,14 @@ class Config:
                 file_size
                 moderated
             }
+            ... on ActivityInterface {
+                _id
+                actor {
+                    ... on User {
+                        username
+                    }
+                }
+            }
         }
     }
 
@@ -192,41 +200,49 @@ class ReportProcessor:
         if node['total_awarded_amount'] and float(node['total_awarded_amount']) > 0:
             bounty_text = f"{node['total_awarded_amount']} {self.config.CURRENCY_MAP[node['program']['currency'].upper()]}"
 
-        content = f"""# Security Vulnerability Report
+        # Create metadata line
+        metadata = f"Metadata:\nReport ID: {node['_id']} | Reporter: {node['reporter']['username']} | Program: {node['program']['name']} | " \
+                  f"Severity: {node['severity_rating']} | Status: {node['report']['substate']} | " \
+                  f"CVE IDs: {', '.join(node['cve_ids']) if node['cve_ids'] else 'None'}"
 
-## Metadata
-- Report ID: {node['_id']}
-- Reporter: {node['reporter']['username']}
-- Program: {node['program']['name']}
-- Severity: {node['severity_rating']}
-- Status: {node['report']['substate']}
-- Disclosure Date: {report_details['disclosed_at']}
-- CVE IDs: {', '.join(node['cve_ids']) if node['cve_ids'] else 'None'}
-- CWE: {node['cwe']}
-- Bounty: {bounty_text}
-- Votes: {node['votes']}
-- URL: {report_details['link']}
+        # Create title section
+        title_section = f"Title:\n{report_details['title']}"
 
-## Title
-{report_details['title']}
+        # Create technical description section
+        tech_description = f"Technical Description:\n{report_details['vulnerability_information']}"
 
-## Technical Description
-{report_details['vulnerability_information']}
+        # Create impact summary section
+        impact_summary = f"Impact Summary:\n{report_details['summaries']}"
 
-## Impact Summary
-{report_details['summaries']}
+        # Combine all sections
+        content = f"{metadata}\n\n{title_section}\n\n{tech_description}\n\n{impact_summary}\n\n"
 
-## Discussion Thread
-"""
-        # Add formatted comments with clear delineation
+        # Add formatted comments with metadata
         comments = self.format_comments(node['report']['comments']['nodes'])
+        
         for i, comment in enumerate(comments, 1):
             if 'message' in comment:
-                content += f"\n### Comment {i}\n{comment['message']}\n"
+                comment_metadata = (
+                    f"Metadata:\n"
+                    f"- Report ID: {node['_id']}\n"
+                    f"- Section: Comment\n"
+                    f"- Comment Number: {i}\n"
+                    f"- Author: {comment['author']}\n\n"
+                )
+                content += f"Comment {i}:\n{comment['message']}\n\n{comment_metadata}"
+
             if 'attachments' in comment:
                 for j, attachment in enumerate(comment['attachments'], 1):
                     if 'content' in attachment:
-                        content += f"\n#### Technical Details {i}.{j}\n```\n{attachment['content']}\n```\n"
+                        attachment_metadata = (
+                            f"Metadata:\n"
+                            f"- Report ID: {node['_id']}\n"
+                            f"- Section: Technical Details\n"
+                            f"- Comment Number: {i}\n"
+                            f"- Attachment Number: {j}\n"
+                            f"- Author: {comment['author']}\n\n"
+                        )
+                        content += f"Technical Details {i}.{j}:\n```\n{attachment['content']}\n```\n\n{attachment_metadata}"
 
         report_file = self.config.REPORTS_DIR / f"{node['_id']}.md"
         report_file.write_text(content, encoding='utf-8')
@@ -238,6 +254,7 @@ class ReportProcessor:
             
             if comment.get("message"):
                 comment_obj["message"] = comment["message"]
+                comment_obj["author"] = comment["actor"]["username"]
             
             if comment.get("attachments"):
                 comment_obj["attachments"] = []
