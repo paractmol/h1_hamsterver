@@ -5,7 +5,7 @@ import requests
 import time
 import os
 import sys
-import pdb
+
 @dataclass
 class Config:
     DOWNLOADS_DIR: Path = Path("downloads")
@@ -203,7 +203,8 @@ class ReportProcessor:
         # Create metadata line
         metadata = f"Metadata:\nReport ID: {node['_id']} | Reporter: {node['reporter']['username']} | Program: {node['program']['name']} | " \
                   f"Severity: {node['severity_rating']} | Status: {node['report']['substate']} | " \
-                  f"CVE IDs: {', '.join(node['cve_ids']) if node['cve_ids'] else 'None'}"
+                  f"CVE IDs: {', '.join(node['cve_ids']) if node['cve_ids'] else 'None'} | " \
+                  f"Bounty: {bounty_text}"
 
         # Create title section
         title_section = f"Title:\n{report_details['title']}"
