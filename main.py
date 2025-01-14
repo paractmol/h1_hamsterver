@@ -5,7 +5,6 @@ import requests
 import time
 import os
 import sys
-import pdb
 
 @dataclass
 class Config:
