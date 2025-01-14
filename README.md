@@ -1,6 +1,7 @@
 # HackerOne Report Downloader
 
-This script downloads the latest disclosed reports from HackerOne. The reports are saved in markdown files in the `downloads/reports` directory and can be added to the LLM for analysis and an easier way to search for vulnerabilities.
+
+Download the latest disclosed reports from HackerOne and save them in markdown files in the `downloads/reports` directory for later LLM use.
 
 ## History
 
