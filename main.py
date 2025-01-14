@@ -4,6 +4,8 @@ from pathlib import Path
 import requests
 import time
 import os
+import sys
+import pdb
 
 @dataclass
 class Config:
@@ -13,6 +15,15 @@ class Config:
     ALLOWED_CONTENT_TYPES: List[str] = field(default_factory=lambda: ["text/markdown", "text/x-diff"])
     BASE_URL: str = "https://hackerone.com"
     RATE_LIMIT_DELAY: int = 1  # seconds between requests
+    CURRENCY_MAP: Dict[str, str] = field(default_factory=lambda: {
+        "USD": "$",
+        "EUR": "€",
+        "GBP": "£",
+        "JPY": "¥",
+        "AUD": "A$",
+        "CAD": "C$",
+        "CHF": "CHF",
+    })
     QUERY: str = """
     query {
       me {
@@ -152,7 +163,7 @@ class HackerOneAPI:
 class ReportProcessor:
     def __init__(self, config: Config):
         self.config = config
-        self.reports: List[Dict[str, Any]] = []
+        self.reports: Dict[str, Dict[str, Any]] = {}
 
     def process_report(self, node: Dict[str, Any], report_data: Dict[str, Any]) -> None:
         report = {
@@ -172,32 +183,39 @@ class ReportProcessor:
             "program": node["program"],
             "comments": self.format_comments(node["report"]["comments"]["nodes"])
         }
-        self.reports.append(report)
+        self.reports[node["_id"]] = report
+        return report
 
-    def save_report_markdown(self, report_data: Dict[str, Any], report_id: str, node: Dict[str, Any]) -> None:
+    def save_report_markdown(self, node: Dict[str, Any]) -> None:
+        report_details = self.reports[node['_id']]
+
+        bounty_text = "No bounty information available"
+        if node['total_awarded_amount'] and float(node['total_awarded_amount']) > 0:
+            bounty_text = f"{node['total_awarded_amount']} {self.config.CURRENCY_MAP[node['program']['currency'].upper()]}"
+
         content = f"""# Security Vulnerability Report
 
 ## Metadata
-- Report ID: {report_id}
+- Report ID: {node['_id']}
 - Reporter: {node['reporter']['username']}
 - Program: {node['program']['name']}
 - Severity: {node['severity_rating']}
 - Status: {node['report']['substate']}
-- Disclosure Date: {report_data['disclosed_at']}
+- Disclosure Date: {report_details['disclosed_at']}
 - CVE IDs: {', '.join(node['cve_ids']) if node['cve_ids'] else 'None'}
 - CWE: {node['cwe']}
-- Bounty: ${node['total_awarded_amount']}
+- Bounty: {bounty_text}
 - Votes: {node['votes']}
-- URL: {report_data['url']}
+- URL: {report_details['link']}
 
 ## Title
-{report_data['title']}
+{report_details['title']}
 
 ## Technical Description
-{report_data['vulnerability_information']}
+{report_details['vulnerability_information']}
 
 ## Impact Summary
-{' '.join(filter(None, [s.get('content') for s in report_data['summaries']]))}
+{report_details['summaries']}
 
 ## Discussion Thread
 """
@@ -211,7 +229,7 @@ class ReportProcessor:
                     if 'content' in attachment:
                         content += f"\n#### Technical Details {i}.{j}\n```\n{attachment['content']}\n```\n"
 
-        report_file = self.config.REPORTS_DIR / f"{report_id}.md"
+        report_file = self.config.REPORTS_DIR / f"{node['_id']}.md"
         report_file.write_text(content, encoding='utf-8')
 
     def format_comments(self, comments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -257,26 +275,30 @@ class ReportProcessor:
             return f"Error reading attachment: {str(e)}"
 
 def main():
+    # Get count from command line argument, default to 10 if not provided
+    count = int(sys.argv[1]) if len(sys.argv) > 1 else 10
+    
     config = Config()
     api = HackerOneAPI(config)
     processor = ReportProcessor(config)
     
     try:
-        # Fetch reports
-        nodes = api.fetch_reports(count=10)  # Example count
+        # Fetch reports using provided count
+        nodes = api.fetch_reports(count=count)
         
         # Process each report
         for node in nodes:
             print(f"Processing report {node['_id']}")
-            report_data = api.fetch_report_details(node['_id'])
-            
-            if report_data:
-                processor.save_report_markdown(report_data, node['_id'], node)
-                processor.process_report(node, report_data)
+
+            report_details = api.fetch_report_details(node['_id'])
+            if report_details:
+                processor.process_report(node, report_details)
+                processor.save_report_markdown(node)
                 
+    except ValueError:
+        print("Please provide a valid number for report count")
     except Exception as e:
         print(f"Error during execution: {e}")
 
 if __name__ == "__main__":
     main()
-
